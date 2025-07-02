@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"os"
 	"tcp-scaner/internal/tcp"
 	"time"
 )
@@ -16,6 +15,11 @@ func StartScanner(data data) {
 		EndPort:     data.endPort,
 		Concurrency: data.concurrency,
 		Timeout:     time.Duration(data.timeout) * time.Millisecond,
+	}
+
+	if data.startPort < 1 || data.endPort > 65535 || data.startPort > data.endPort {
+		fmt.Println("Invalid port range")
+		return
 	}
 
 	log.Printf("Scanning %s ports %d–%d with %d workers and timeout %dms...\n",
@@ -50,11 +54,6 @@ func main() {
 	flag.IntVar(&info.concurrency, "workers", 100, "Number of concurrent workers")
 	flag.IntVar(&info.timeout, "timeout", 500, "Timeout in milliseconds per connection")
 	flag.Parse()
-
-	if info.startPort < 1 || info.endPort > 65535 || info.startPort > info.endPort {
-		fmt.Println("Invalid port range")
-		os.Exit(1)
-	}
 
 	StartScanner(info)
 }

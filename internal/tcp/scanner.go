@@ -23,7 +23,6 @@ func (s *Scanner) Run() []int {
 	ports := make(chan int, s.Concurrency)
 	results := make(chan int, s.EndPort-s.StartPort+1)
 
-	// запускаем воркеры
 	for i := 0; i < s.Concurrency; i++ {
 		go func() {
 			for port := range ports {
@@ -32,20 +31,23 @@ func (s *Scanner) Run() []int {
 		}()
 	}
 
-	// добавляем порты в очередь
 	for port := s.StartPort; port <= s.EndPort; port++ {
 		wg.Add(1)
 		ports <- port
 	}
 
-	wg.Wait()
 	close(ports)
-	close(results)
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
 
 	var openPorts []int
 	for port := range results {
 		openPorts = append(openPorts, port)
 	}
+
 	sort.Ints(openPorts)
 	return openPorts
 }
