@@ -2,7 +2,9 @@ package request
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/google/uuid"
+	"log"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -23,7 +25,7 @@ func StartScanner() http.HandlerFunc {
 		}
 
 		TaskID := uuid.New().String()
-		slog.Info("Generate UUID", TaskID)
+		slog.Info("Generate UUID" + TaskID)
 		tasks.Store(TaskID, ScanResult{Status: ScanStatusPending})
 		go func(id string, req ScanRequest) {
 			scanner := tcp.Scanner{
@@ -37,10 +39,40 @@ func StartScanner() http.HandlerFunc {
 			if openPorts != nil {
 				tasks.Store(TaskID, ScanResult{Status: ScanStatusSuccess, Result: openPorts})
 			}
-			slog.Info("%s :Open ports on %s: %v\n", TaskID, input.Host, openPorts)
+			slog.Info("Finished scanner" + TaskID)
 		}(TaskID, input)
 
 		w.WriteHeader(http.StatusAccepted)
 		_ = json.NewEncoder(w).Encode(map[string]string{"task_id": TaskID})
+	}
+}
+
+func StartScannerLocal(data ScanRequest) {
+	scanner := tcp.Scanner{
+		Address:     data.Host,
+		StartPort:   data.StartPort,
+		EndPort:     data.EndPort,
+		Concurrency: data.Concurrency,
+		Timeout:     time.Duration(data.Timeout) * time.Millisecond,
+	}
+
+	if data.StartPort < 1 || data.EndPort > 65535 || data.StartPort > data.EndPort {
+		fmt.Println("Invalid port range")
+		return
+	}
+
+	log.Printf("Scanning %s ports %d–%d with %d workers and timeout %dms...\n",
+		data.Host, data.StartPort, data.EndPort, data.Concurrency, data.Timeout)
+
+	openPorts := scanner.Run()
+
+	if len(openPorts) == 0 {
+		log.Println("No open ports found.")
+		return
+	}
+
+	log.Println("Open ports:")
+	for _, port := range openPorts {
+		fmt.Printf(" - %d open\n", port)
 	}
 }
